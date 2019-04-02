@@ -115,3 +115,19 @@ func TestFromMnemonic(t *testing.T) {
 
 	println(hex.EncodeToString(k.PriKey()))
 }
+
+func TestNeo(t *testing.T) {
+	k, err := key.New("neo")
+
+	require.NoError(t, err)
+
+	println("address", k.Address())
+
+	var buff bytes.Buffer
+
+	err = key.Encrypt("wif.neo", k, nil, &buff)
+
+	require.NoError(t, err)
+
+	println("wif", buff.String())
+}
