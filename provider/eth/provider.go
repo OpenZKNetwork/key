@@ -100,8 +100,11 @@ func (key *keyImpl) Sign(hashed []byte) ([]byte, error) {
 
 	buff := make([]byte, 2*size+1)
 
-	copy(buff, sig.R.Bytes())
-	copy(buff[size:], sig.S.Bytes())
+	r := sig.R.Bytes()
+	s := sig.S.Bytes()
+
+	copy(buff[size-len(r):size], r)
+	copy(buff[2*size-len(s):2*size], s)
 	buff[2*size] = sig.V.Bytes()[0]
 
 	return buff, nil
