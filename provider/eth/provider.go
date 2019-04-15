@@ -101,7 +101,16 @@ func (key *keyImpl) Sign(hashed []byte) ([]byte, error) {
 	buff := make([]byte, 2*size+1)
 
 	r := sig.R.Bytes()
+
+	if len(r) > size {
+		r = r[:size]
+	}
+
 	s := sig.S.Bytes()
+
+	if len(s) > size {
+		s = s[:size]
+	}
 
 	copy(buff[size-len(r):size], r)
 	copy(buff[2*size-len(s):2*size], s)
