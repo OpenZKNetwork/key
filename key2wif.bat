@@ -1,1 +1,1 @@
-go build  -o .\.build\key2wif.exe .\cmd\key2wif && .\.build\key2wif  %*
+go build  -ldflags "-w -s" -o .\.build\key2wif.exe .\cmd\key2wif && .\.build\key2wif  %*
