@@ -22,14 +22,13 @@ var (
 	oneInitializer = []byte{0x01}
 )
 
-// Sign .
-func Sign(privateKey *ecdsa.PrivateKey, hash []byte) (*sign.Signature, error) {
-
+// SignWithNonce .
+func SignWithNonce(privateKey *ecdsa.PrivateKey, hash []byte, nonce int) (*sign.Signature, error) {
 	N := privateKey.Curve.Params().N
 
 	halfOrder := new(big.Int).Rsh(N, 1)
 
-	k := nonceRFC6979(privateKey.Curve, privateKey.D, hash)
+	k := nonceRFC6979(privateKey.Curve, privateKey.D, hash, nonce)
 
 	inv := new(big.Int).ModInverse(k, N)
 	r, _ := privateKey.Curve.ScalarBaseMult(k.Bytes())
@@ -53,12 +52,25 @@ func Sign(privateKey *ecdsa.PrivateKey, hash []byte) (*sign.Signature, error) {
 	if s.Sign() == 0 {
 		return nil, errors.New("calculated S is zero")
 	}
+
 	return &sign.Signature{R: r, S: s}, nil
+}
+
+// Sign .
+func Sign(privateKey *ecdsa.PrivateKey, hash []byte) (*sign.Signature, error) {
+	return SignWithNonce(privateKey, hash, 0)
 }
 
 // nonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to RFC 6979.
 // It takes a 32-byte hash as an input and returns 32-byte nonce to be used in ECDSA algorithm.
-func nonceRFC6979(curve elliptic.Curve, privkey *big.Int, hash []byte) *big.Int {
+func nonceRFC6979(curve elliptic.Curve, privkey *big.Int, hash []byte, nonce int) *big.Int {
+
+	if nonce > 0 {
+		moreHash := sha256.New()
+		moreHash.Write(hash)
+		moreHash.Write(bytes.Repeat([]byte{0x00}, nonce))
+		hash = moreHash.Sum(nil)
+	}
 
 	q := curve.Params().N
 	x := privkey

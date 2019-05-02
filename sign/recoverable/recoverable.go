@@ -1,8 +1,10 @@
 package recoverable
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
@@ -65,16 +67,15 @@ type Cofactor interface {
 	H() int
 }
 
-// Sign .
-func Sign(privateKey *ecdsa.PrivateKey, hash []byte, compressed bool) (*sign.Signature, error) {
-
+// SignWithNonce .
+func SignWithNonce(privateKey *ecdsa.PrivateKey, hash []byte, nonce int, compressed bool) (*sign.Signature, error) {
 	cofactor, ok := privateKey.Curve.(Cofactor)
 
 	if !ok {
 		return nil, xerrors.Wrapf(ErrCurve, "curve %s not support cofactor params", privateKey.Curve.Params().Name)
 	}
 
-	sig, err := rfc6979.Sign(privateKey, hash)
+	sig, err := rfc6979.SignWithNonce(privateKey, hash, nonce)
 
 	if err != nil {
 		return nil, err
@@ -103,8 +104,19 @@ func Sign(privateKey *ecdsa.PrivateKey, hash []byte, compressed bool) (*sign.Sig
 	return nil, xerrors.Wrapf(err, "can't find v for public key")
 }
 
-// Recover recover public key from sig and hash
-func Recover(curve elliptic.Curve, sig *sign.Signature, hash []byte) (*ecdsa.PublicKey, bool, error) {
+// Sign .
+func Sign(privateKey *ecdsa.PrivateKey, hash []byte, compressed bool) (*sign.Signature, error) {
+	return SignWithNonce(privateKey, hash, 0, compressed)
+}
+
+// RecoverWithNonce .
+func RecoverWithNonce(curve elliptic.Curve, sig *sign.Signature, hash []byte, nonce int) (*ecdsa.PublicKey, bool, error) {
+	if nonce > 0 {
+		moreHash := sha256.New()
+		moreHash.Write(hash)
+		moreHash.Write(bytes.Repeat([]byte{0x00}, nonce))
+		hash = moreHash.Sum(nil)
+	}
 
 	v := sig.V.Bytes()
 
@@ -117,6 +129,11 @@ func Recover(curve elliptic.Curve, sig *sign.Signature, hash []byte) (*ecdsa.Pub
 	}
 
 	return key, ((v[0] - 27) & 4) == 4, nil
+}
+
+// Recover recover public key from sig and hash
+func Recover(curve elliptic.Curve, sig *sign.Signature, hash []byte) (*ecdsa.PublicKey, bool, error) {
+	return RecoverWithNonce(curve, sig, hash, 0)
 }
 
 // hashToInt converts a hash value to an integer. There is some disagreement

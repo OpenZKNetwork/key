@@ -15,14 +15,22 @@ type encryptorImpl struct {
 	Version byte
 }
 
-func (encryptorImpl *encryptorImpl) Encrypt(key key.Key, property key.Property, writer io.Writer) error {
-	bytesOfPrivateKey := key.PriKey()
+func (encryptorImpl *encryptorImpl) Encrypt(k key.Key, property key.Property, writer io.Writer) error {
+	bytesOfPrivateKey := k.PriKey()
 
 	if len(bytesOfPrivateKey) == 32 {
 		bytesOfPrivateKey = append(bytesOfPrivateKey, 0x01)
 	}
 
-	wif := base58.CheckEncode(bytesOfPrivateKey, encryptorImpl.Version)
+	withNetID, ok := k.(key.WithNetID)
+
+	version := encryptorImpl.Version
+
+	if ok {
+		version = withNetID.NetID()
+	}
+
+	wif := base58.CheckEncode(bytesOfPrivateKey, version)
 
 	_, err := writer.Write([]byte(wif))
 
@@ -33,7 +41,7 @@ func (encryptorImpl *encryptorImpl) Encrypt(key key.Key, property key.Property, 
 	return nil
 }
 
-func (encryptorImpl *encryptorImpl) Decrypt(key key.Key, property key.Property, reader io.Reader) error {
+func (encryptorImpl *encryptorImpl) Decrypt(k key.Key, property key.Property, reader io.Reader) error {
 	data, err := ioutil.ReadAll(reader)
 
 	bytesOfPrivateKey, version, err := base58.CheckDecode(string(data))
@@ -42,12 +50,28 @@ func (encryptorImpl *encryptorImpl) Decrypt(key key.Key, property key.Property, 
 		return err
 	}
 
-	/* Check that the version byte is 0x80 */
-	if version != encryptorImpl.Version {
-		return xerrors.New(fmt.Sprintf("invalid version %v", version))
+	withNetID, ok := k.(key.WithNetID)
+
+	if ok {
+
+		checked := false
+
+		for _, v := range withNetID.SupportNetID() {
+			if version == v {
+				checked = true
+				break
+			}
+		}
+
+		if !checked {
+			return xerrors.New(fmt.Sprintf("invalid version %v", version))
+		}
+	} else {
+		if version != encryptorImpl.Version {
+			return xerrors.New(fmt.Sprintf("invalid version %v", version))
+		}
 	}
 
-	/* If the private key bytes length is 33, check that suffix byte is 0x01 (for compression) and strip it off */
 	if len(bytesOfPrivateKey) == 33 {
 		if bytesOfPrivateKey[len(bytesOfPrivateKey)-1] != 0x01 {
 			return xerrors.New(fmt.Sprintf("Invalid private key, unknown suffix byte 0x%02x", bytesOfPrivateKey[len(bytesOfPrivateKey)-1]))
@@ -55,11 +79,11 @@ func (encryptorImpl *encryptorImpl) Decrypt(key key.Key, property key.Property, 
 		bytesOfPrivateKey = bytesOfPrivateKey[0:32]
 	}
 
-	key.SetBytes(bytesOfPrivateKey)
+	k.SetBytes(bytesOfPrivateKey)
 
 	return nil
 }
 
 func init() {
-	key.RegisterEncryptor("wif.neo", &encryptorImpl{Version: 0x80})
+	key.RegisterEncryptor("wif", &encryptorImpl{Version: 0x80})
 }

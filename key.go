@@ -22,8 +22,10 @@ type Property map[string]string
 
 // Errors
 var (
-	ErrDriver    = errors.New("unknown driver")
-	ErrPublicKey = errors.New("invalid public key")
+	ErrDriver        = errors.New("unknown driver")
+	ErrPublicKey     = errors.New("invalid public key")
+	ErrCanonicalSign = errors.New("couldn't find a canonical signature")
+	ErrRecoverSign   = errors.New("recover error")
 )
 
 // Key blockchain key facade
@@ -34,6 +36,13 @@ type Key interface {
 	SetBytes(priKey []byte)             // set private key bytes
 	Sign(hashed []byte) ([]byte, error) // sign the hashed message
 	Provider() Provider                 // provider
+}
+
+// WithNetID .
+type WithNetID interface {
+	NetID() byte
+	SetNetID(id byte)
+	SupportNetID() []byte
 }
 
 // Provider the key service provider
