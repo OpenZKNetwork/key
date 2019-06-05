@@ -134,6 +134,19 @@ func TestNeo(t *testing.T) {
 	println("wif", buff.String())
 }
 
+func TestOnt(t *testing.T) {
+
+	k, err := key.New("ont")
+
+	require.NoError(t, err)
+
+	err = key.Decrypt("wif", k, nil, bytes.NewBufferString("L1MNCbtnfUBvSebyrhjE3QmmvUaUXLziyWEjkVGHJhCusMXYAyKB"))
+
+	require.NoError(t, err)
+
+	println("===", k.Address())
+}
+
 func TestEOS(t *testing.T) {
 	k, err := key.New("eos")
 
