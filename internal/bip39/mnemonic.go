@@ -20,6 +20,14 @@ var (
 	BigTwo                  = big.NewInt(2)
 )
 
+const (
+	BIPPurpose         = 44
+	BIPCoinType        = 714
+	BIPChange          = false
+	BIP44Prefix        = "44'/714'/"
+	FullFundraiserPath = BIP44Prefix + "0'/0/0"
+)
+
 // NewEntropy will create random entropy bytes
 // so long as the requested size bitSize is an appropriate size.
 func NewEntropy(bitSize int) ([]byte, error) {

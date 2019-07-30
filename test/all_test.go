@@ -34,8 +34,27 @@ func TestDidKey(t *testing.T) {
 	require.NoError(t, err)
 
 	println("address", did.Address())
-
 }
+
+func TestBNB(t *testing.T) {
+	k, err := key.New("bnb")
+
+	require.NoError(t, err)
+
+	println("address", k.Address(), len(k.PriKey()))
+
+	t.Logf("pri key %+v ", hex.EncodeToString(k.PriKey()))
+
+	key.From("bnb", k)
+	println("address", k.Address(), len(k.PriKey()))
+
+	t.Logf("pri key %+v ", hex.EncodeToString(k.PriKey()))
+	
+	address,err:=k.Provider().PublicKeyToAddress(k.PubKey())
+	require.NoError(t, err)
+	t.Logf("address %+v ", address)
+}
+
 
 func TestSign(t *testing.T) {
 
