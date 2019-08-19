@@ -2,8 +2,12 @@ package test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
+
+	"github.com/openzknetwork/key/internal/base58"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,13 +17,52 @@ import (
 )
 
 func TestEthKey(t *testing.T) {
-	k, err := key.New("eos")
+	k, err := key.New("eth")
 
 	require.NoError(t, err)
 
 	println("address", k.Address())
 
 	println(len(k.PriKey()))
+}
+
+func TestHex(t *testing.T) {
+	//address to hex
+	b := base58.Decode("T9yai3UbXbDaGpVdsDHZyZC3wjqSLk4aor")
+	println(strings.ToUpper(hex.EncodeToString(b[:len(b)-4])))
+
+
+	//hex to address
+	// 41C5CDDDB85D7E57C399A9A9D03E93F2B8CDF66943
+	// 4189139CB1387AF85E3D24E212A008AC974967E561
+	var addressCheck []byte
+	address, _ := hex.DecodeString("41C5CDDDB85D7E57C399A9A9D03E93F2B8CDF66943")
+	println(base58.Encode(address))
+
+	sha := sha256.New()
+	sha.Write(address)
+	h1 := sha.Sum(nil)
+	sha2 := sha256.New()
+	sha2.Write(h1)
+	h2 := sha2.Sum(nil)
+
+	addressCheck = append(addressCheck, address...)
+	addressCheck = append(addressCheck, h2[0:4]...)
+	s := base58.Encode(addressCheck)
+	println(s)
+	// s := base58.Encode([]byte("4189139CB1387AF85E3D24E212A008AC974967E561"))
+	// println(string(s))
+}
+func TestTrxKey(t *testing.T) {
+	k, err := key.New("trx")
+
+	require.NoError(t, err)
+
+	println("address", k.Address())
+	println(hex.EncodeToString(k.PriKey()))
+
+	k.SetBytes(k.PriKey())
+	println("address", k.Address())
 }
 
 func TestDidKey(t *testing.T) {
@@ -49,12 +92,11 @@ func TestBNB(t *testing.T) {
 	println("address", k.Address(), len(k.PriKey()))
 
 	t.Logf("pri key %+v ", hex.EncodeToString(k.PriKey()))
-	
-	address,err:=k.Provider().PublicKeyToAddress(k.PubKey())
+
+	address, err := k.Provider().PublicKeyToAddress(k.PubKey())
 	require.NoError(t, err)
 	t.Logf("address %+v ", address)
 }
-
 
 func TestSign(t *testing.T) {
 

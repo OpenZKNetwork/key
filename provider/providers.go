@@ -7,4 +7,5 @@ import (
 	_ "github.com/openzknetwork/key/provider/neo" //
 	_ "github.com/openzknetwork/key/provider/ont" //
 	_ "github.com/openzknetwork/key/provider/bnb" //
+	_ "github.com/openzknetwork/key/provider/trx" //trx
 )
