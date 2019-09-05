@@ -84,8 +84,7 @@ func getEntropyCSPRNG(n int) []byte {
 	return mainBuff
 }
 
-func (encoding *encodingImpl) Encrypt(key key.Key, attrs key.Property, writer io.Writer) error {
-
+func (encoding *encodingImpl) EncryptBytes(keyBytes []byte, attrs key.Property, writer io.Writer) error {
 	password := attrs["password"]
 
 	authArray := []byte(password)
@@ -99,12 +98,12 @@ func (encoding *encodingImpl) Encrypt(key key.Key, attrs key.Property, writer io
 
 	encryptKey := derivedKey[:16]
 
-	keyBytes := key.PriKey()
-
 	if len(keyBytes) < 32 {
-		keyBytes := make([]byte, 32)
+		buff := make([]byte, 32)
 
-		copy(keyBytes, key.PriKey())
+		copy(buff, keyBytes)
+
+		keyBytes = buff
 	}
 
 	iv := getEntropyCSPRNG(aes.BlockSize) // 16
@@ -141,7 +140,7 @@ func (encoding *encodingImpl) Encrypt(key key.Key, attrs key.Property, writer io
 		MAC:          hex.EncodeToString(mac),
 	}
 	encryptedKeyJSONV3 := encryptedKeyJSONV3{
-		key.Address(),
+		attrs["address"],
 		cryptoStruct,
 		uuid.New(),
 		3,
@@ -161,39 +160,55 @@ func (encoding *encodingImpl) Encrypt(key key.Key, attrs key.Property, writer io
 	return nil
 }
 
-func (encoding *encodingImpl) Decrypt(key key.Key, attrs key.Property, reader io.Reader) error {
-
+func (encoding *encodingImpl) DecryptBytes(attrs key.Property, reader io.Reader) ([]byte, error) {
 	password := attrs["password"]
 
 	data, err := ioutil.ReadAll(reader)
 
 	if err != nil {
-		return xerrors.Wrapf(err, "read all data from reader err")
+		return nil, xerrors.Wrapf(err, "read all data from reader err")
 	}
 
 	// Parse the json into a simple map to fetch the key version
 	kv := make(map[string]interface{})
 	if err := json.Unmarshal(data, &kv); err != nil {
-		return xerrors.Wrapf(err, "unmarshal kv error")
+		return nil, xerrors.Wrapf(err, "unmarshal kv error")
 	}
 
 	if version, ok := kv["version"].(string); ok && version != "3" {
-		return xerrors.Errorf("cryptox library only support keystore version 3")
+		return nil, xerrors.Errorf("cryptox library only support keystore version 3")
 	}
 
 	k := new(encryptedKeyJSONV3)
 
 	if err := json.Unmarshal(data, k); err != nil {
-		return xerrors.Wrapf(err, "unmarshal encryptedKeyJSONV3 error")
+		return nil, xerrors.Wrapf(err, "unmarshal encryptedKeyJSONV3 error")
 	}
 
 	keyBytes, _, err := encoding.decryptKeyV3(k, password)
 
 	if err != nil {
+		return nil, err
+	}
+
+	return keyBytes, nil
+}
+
+func (encoding *encodingImpl) Encrypt(key key.Key, attrs key.Property, writer io.Writer) error {
+
+	attrs["addresss"] = key.Address()
+
+	return encoding.EncryptBytes(key.PriKey(), attrs, writer)
+}
+
+func (encoding *encodingImpl) Decrypt(key key.Key, attrs key.Property, reader io.Reader) error {
+	buff, err := encoding.DecryptBytes(attrs, reader)
+
+	if err != nil {
 		return err
 	}
 
-	key.SetBytes(keyBytes)
+	key.SetBytes(buff)
 
 	return nil
 }
