@@ -31,7 +31,6 @@ func TestHex(t *testing.T) {
 	b := base58.Decode("T9yai3UbXbDaGpVdsDHZyZC3wjqSLk4aor")
 	println(strings.ToUpper(hex.EncodeToString(b[:len(b)-4])))
 
-
 	//hex to address
 	// 41C5CDDDB85D7E57C399A9A9D03E93F2B8CDF66943
 	// 4189139CB1387AF85E3D24E212A008AC974967E561
@@ -248,4 +247,12 @@ func TestEOSSign(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, pubkey, k.PubKey())
+}
+
+func TestLen(t *testing.T) {
+	s := "AH1AAcG7um6Maq7ZJ8iMhdPuvZnu4iZvk7"
+	println(len(s))
+
+	s2:="2Fe7ar8ikisocUaA8Hq7ajHdzgxV9ejNPXAc3vPqWcdn"
+	println(len(s2))
 }
