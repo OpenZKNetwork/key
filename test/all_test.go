@@ -292,4 +292,10 @@ func TestMnemonicDrived(t *testing.T) {
 	require.NoError(t, err)
 
 	println(mnemonic)
+
+	k, err = key.FromMnemonic("eth", mnemonic, "m/44'/60'/0'/0/0")
+
+	require.NoError(t, err)
+
+	println(k.Address())
 }
