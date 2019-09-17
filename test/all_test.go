@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openzknetwork/key/internal/bip39"
+
 	"github.com/openzknetwork/key/internal/base58"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +17,17 @@ import (
 	_ "github.com/openzknetwork/key/encryptor"
 	_ "github.com/openzknetwork/key/provider"
 )
+
+
+func TestDid(t *testing.T) {
+	k, err := key.New("did")
+
+	require.NoError(t, err)
+
+	println("address", k.Address())
+
+	println(len(k.PriKey()))
+}
 
 func TestEthKey(t *testing.T) {
 	k, err := key.New("eth")
@@ -250,9 +263,72 @@ func TestEOSSign(t *testing.T) {
 }
 
 func TestLen(t *testing.T) {
-	s := "AH1AAcG7um6Maq7ZJ8iMhdPuvZnu4iZvk7"
+	s := "17aUoDBkpSZxrPGRQNn7CsJaWy3X3vwhwb"
 	println(len(s))
 
-	s2:="2Fe7ar8ikisocUaA8Hq7ajHdzgxV9ejNPXAc3vPqWcdn"
+	s2 := "d662002f040affd6260652c861e9e10737fff0c240a1973e0f4056e6cc44aecc"
 	println(len(s2))
+}
+func TestBip39(t *testing.T) {
+	k, err := key.New("did")
+
+	require.NoError(t, err)
+
+	println(k.Address())
+
+	mnemonic, err := bip39.NewMnemonic(k.PriKey(), bip39.ENUS())
+
+	require.NoError(t, err)
+
+	k, err = key.FromMnemonic("did", mnemonic, "")
+
+	require.NoError(t, err)
+
+	println(k.Address())
+
+	println(mnemonic)
+
+}
+
+func TestMnemonicDrived(t *testing.T) {
+	mnemonic, k, err := key.NewMnemonic("did", "m/44'/201910'/0'/0/0")
+
+	require.NoError(t, err)
+
+	println(mnemonic, "\n", k.Address())
+
+	var buff bytes.Buffer
+
+	err = key.MnemonicToKeystore(mnemonic, "test", &buff)
+
+	require.NoError(t, err)
+
+	println(buff.String())
+
+	mnemonic, err = key.MnemonicFromKeystore(&buff, "test")
+
+	require.NoError(t, err)
+
+	println(mnemonic)
+
+	k, err = key.FromMnemonic("eth", mnemonic, "m/44'/60'/0'/0/0")
+
+	require.NoError(t, err)
+
+	println(k.Address())
+}
+
+func TestParseMnemonic(t *testing.T){
+	mnemonic:="keep sentence oxygen virtual flush aspect witness tent latin report auction thumb"
+	k, err := key.FromMnemonic("eth", mnemonic, "m/44'/60'/0'/0/0")
+
+	require.NoError(t, err)
+
+	println(k.Address())
+
+	k, err = key.FromMnemonic("did", mnemonic, "m/44'/201910'/0'/0/0")
+
+	require.NoError(t, err)
+
+	println(k.Address())
 }

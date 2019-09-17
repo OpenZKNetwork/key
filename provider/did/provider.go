@@ -53,7 +53,7 @@ func pubKeyToAddress(pub *ecdsa.PublicKey) string {
 
 	did := append(hashed, sum...)
 
-	return "did:lpt:" + base58.CheckEncode(did, version)
+	return "did:w3:" + base58.CheckEncode(did, version)
 }
 
 type didImpl struct {
