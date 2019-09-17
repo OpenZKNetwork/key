@@ -70,6 +70,12 @@ type Encryptor interface {
 	Decrypt(key Key, property Property, reader io.Reader) error
 }
 
+// BytesEncryptor .
+type BytesEncryptor interface {
+	EncryptBytes(source []byte, property Property, writer io.Writer) error
+	DecryptBytes(property Property, reader io.Reader) ([]byte, error)
+}
+
 // RegisterProvider register provider
 func RegisterProvider(provider Provider) {
 	injector.Register(prefix+provider.Name(), provider)
@@ -178,6 +184,40 @@ func Decrypt(encryptor string, key Key, attrs Property, reader io.Reader) error 
 	}
 
 	return nil
+}
+
+// MnemonicToKeystore .
+func MnemonicToKeystore(mnemonic string, password string, writer io.Writer) error {
+
+	ec, err := getEncryptor("web3.light")
+
+	if err != nil {
+		return err
+	}
+
+	bytesec, _ := ec.(BytesEncryptor)
+
+	return bytesec.EncryptBytes([]byte(mnemonic), Property{"password": password}, writer)
+}
+
+// MnemonicFromKeystore .
+func MnemonicFromKeystore(reader io.Reader, password string) (string, error) {
+
+	ec, err := getEncryptor("web3.light")
+
+	if err != nil {
+		return "", err
+	}
+
+	bytesec, _ := ec.(BytesEncryptor)
+
+	buff, err := bytesec.DecryptBytes(Property{"password": password}, reader)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(buff), nil
 }
 
 // NewMnemonic .

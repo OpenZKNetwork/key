@@ -1,91 +1,85 @@
-// Package did Ontology Distributed Identification Protocol impelement
-package did
+package trx
 
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"math/big"
 	"strings"
 
-	"github.com/btcsuite/btcutil/base58"
-	"github.com/openzknetwork/key/internal/hash160"
-	"github.com/openzknetwork/key/sign"
-	"github.com/openzknetwork/key/sign/recoverable"
+	"github.com/openzknetwork/key/internal/base58"
 
 	"github.com/dynamicgo/xerrors"
+	"github.com/openzknetwork/sha3"
+
 	"github.com/openzknetwork/key"
 	"github.com/openzknetwork/key/internal/ecdsax"
 	"github.com/openzknetwork/key/internal/secp256k1"
+	"github.com/openzknetwork/key/sign"
+	"github.com/openzknetwork/key/sign/recoverable"
 )
 
-var version = byte(18)
-
 func pubKeyToAddress(pub *ecdsa.PublicKey) string {
-
 	pubBytes := ecdsax.PublicKeyBytes(pub)
+	hasher := sha3.NewKeccak256()
+	hasher.Write(pubBytes[1:])
 
-	var nonce []byte
+	pubBytes = hasher.Sum(nil)[12:] //取H的最后20字节
 
-	if len(pubBytes) < 32 {
-		nonce = make([]byte, 32)
-		copy(nonce[:], pubBytes)
-	} else {
-		nonce = pubBytes[:32]
+	if len(pubBytes) > 20 {
+		pubBytes = pubBytes[len(pubBytes)-20:]
 	}
 
-	hashed := hash160.Hash160(nonce)
+	var address, addressCheck []byte
+	prefix, _ := hex.DecodeString("41")
 
-	hasher := sha256.New()
+	address = append(address, prefix...)
+	address = append(address, pubBytes...)
 
-	hasher.Write(hashed)
+	sha := sha256.New()
+	sha.Write(address)
+	h1 := sha.Sum(nil)
+	sha2 := sha256.New()
+	sha2.Write(h1)
+	h2 := sha2.Sum(nil)
 
-	sum := hasher.Sum(nil)
+	addressCheck = append(addressCheck, address...)
+	addressCheck = append(addressCheck, h2[0:4]...)
 
-	hasher.Reset()
-
-	hasher.Write(sum)
-
-	sum = hasher.Sum(nil)
-
-	sum = sum[:3]
-
-	did := append(hashed, sum...)
-
-	return "did:w3:" + base58.CheckEncode(did, version)
+	return base58.Encode(addressCheck)
 }
 
-type didImpl struct {
+type keyImpl struct {
 	provider key.Provider
 	key      *ecdsa.PrivateKey
 	address  string // address
 }
 
-func (key *didImpl) Address() string {
+func (key *keyImpl) Address() string {
 	return key.address
 }
 
-func (key *didImpl) Provider() key.Provider {
+func (key *keyImpl) Provider() key.Provider {
 	return key.provider
 }
 
-func (key *didImpl) PriKey() []byte {
+func (key *keyImpl) PriKey() []byte {
 	return ecdsax.PrivateKeyBytes(key.key)
 }
 
-func (key *didImpl) PubKey() []byte {
+func (key *keyImpl) PubKey() []byte {
 	return ecdsax.PublicKeyBytes(&key.key.PublicKey)
 }
 
-func (key *didImpl) SetBytes(priKey []byte) {
-
+func (key *keyImpl) SetBytes(priKey []byte) {
 	key.key = ecdsax.BytesToPrivateKey(priKey, secp256k1.SECP256K1())
 
 	key.address = pubKeyToAddress(&key.key.PublicKey)
 }
 
-func (key *didImpl) Sign(hashed []byte) ([]byte, error) {
+func (key *keyImpl) Sign(hashed []byte) ([]byte, error) {
 
 	sig, err := recoverable.Sign(key.key, hashed, false)
 
@@ -97,8 +91,20 @@ func (key *didImpl) Sign(hashed []byte) ([]byte, error) {
 
 	buff := make([]byte, 2*size+1)
 
-	copy(buff, sig.R.Bytes()[:size])
-	copy(buff[size:], sig.S.Bytes()[:size])
+	r := sig.R.Bytes()
+
+	if len(r) > size {
+		r = r[:size]
+	}
+
+	s := sig.S.Bytes()
+
+	if len(s) > size {
+		s = s[:size]
+	}
+
+	copy(buff[size-len(r):size], r)
+	copy(buff[2*size-len(s):2*size], s)
 	buff[2*size] = sig.V.Bytes()[0]
 
 	return buff, nil
@@ -108,32 +114,7 @@ type providerIml struct {
 }
 
 func (provider *providerIml) Name() string {
-	return "did"
-}
-
-func (provider *providerIml) New() (key.Key, error) {
-
-	privateKey, err := ecdsa.GenerateKey(secp256k1.SECP256K1(), rand.Reader)
-
-	if err != nil {
-		return nil, xerrors.Wrapf(err, "ecdsa GenerateKey(SECP256K1) error")
-	}
-
-	return &didImpl{
-		provider: provider,
-		key:      privateKey,
-		address:  pubKeyToAddress(&privateKey.PublicKey),
-	}, nil
-}
-
-func (provider *providerIml) FromBytes(buff []byte) key.Key {
-	privateKey := ecdsax.BytesToPrivateKey(buff, secp256k1.SECP256K1())
-
-	return &didImpl{
-		provider: provider,
-		key:      privateKey,
-		address:  pubKeyToAddress(&privateKey.PublicKey),
-	}
+	return "trx"
 }
 
 func (provider *providerIml) Verify(pubkey []byte, sig []byte, hash []byte) bool {
@@ -161,15 +142,28 @@ func (provider *providerIml) Verify(pubkey []byte, sig []byte, hash []byte) bool
 	return signature.Verfiy(publicKey, hash)
 }
 
-func (provider *providerIml) PublicKeyToAddress(pubkey []byte) (string, error) {
+func (provider *providerIml) New() (key.Key, error) {
 
-	publicKey := ecdsax.BytesToPublicKey(secp256k1.SECP256K1(), pubkey)
+	privateKey, err := ecdsa.GenerateKey(secp256k1.SECP256K1(), rand.Reader)
 
-	if nil == publicKey {
-		return "", xerrors.Wrapf(key.ErrPublicKey, "decode public key error")
+	if err != nil {
+		return nil, xerrors.Wrapf(err, "ecdsa GenerateKey(SECP256K1) error")
 	}
+	return &keyImpl{
+		provider: provider,
+		key:      privateKey,
+		address:  pubKeyToAddress(&privateKey.PublicKey),
+	}, nil
+}
 
-	return pubKeyToAddress(publicKey), nil
+func (provider *providerIml) FromBytes(buff []byte) key.Key {
+	privateKey := ecdsax.BytesToPrivateKey(buff, secp256k1.SECP256K1())
+
+	return &keyImpl{
+		provider: provider,
+		key:      privateKey,
+		address:  pubKeyToAddress(&privateKey.PublicKey),
+	}
 }
 
 func (provider *providerIml) PrivateToPublic(privateKey []byte) []byte {
@@ -179,6 +173,16 @@ func (provider *providerIml) PrivateToPublic(privateKey []byte) []byte {
 }
 func (provider *providerIml) Curve() elliptic.Curve {
 	return secp256k1.SECP256K1()
+}
+
+func (provider *providerIml) PublicKeyToAddress(pubkey []byte) (string, error) {
+	publicKey := ecdsax.BytesToPublicKey(secp256k1.SECP256K1(), pubkey)
+
+	if nil == pubkey {
+		return "", xerrors.Wrapf(key.ErrPublicKey, "decode public key error")
+	}
+
+	return pubKeyToAddress(publicKey), nil
 }
 
 func (provider *providerIml) Recover(sig []byte, hash []byte) (pubkey []byte, err error) {
@@ -202,23 +206,20 @@ func (provider *providerIml) Recover(sig []byte, hash []byte) (pubkey []byte, er
 }
 
 func (provider *providerIml) ValidAddress(address string) bool {
-	tokens := strings.Split(address, ":")
 
-	if len(tokens) != 3 {
+	address = strings.TrimPrefix(address, "0x")
+
+	if len(address) != 40 {
 		return false
 	}
 
-	if tokens[0] != "did" || tokens[1] != "lpt" {
-		return false
-	}
-
-	_, v, err := base58.CheckDecode(tokens[2])
+	_, err := hex.DecodeString(address)
 
 	if err != nil {
 		return false
 	}
 
-	return v == version
+	return true
 }
 
 func init() {
