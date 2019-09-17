@@ -5,8 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/openzknetwork/key/sign/rfc6979"
@@ -150,42 +148,44 @@ const (
 	PubKeyBytesLenHybrid       = 65
 )
 
-// decompressPoint decompresses a point on the given curve given the X point and
-// the solution to use.
-func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
-	// TODO: This will probably only work for secp256k1 due to
-	// optimizations.
+// // decompressPoint decompresses a point on the given curve given the X point and
+// // the solution to use.
+// func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
+// 	// func decompressPoint(curve *secp256k1.Curve, x *big.Int, ybit bool) (*big.Int, error) {
 
-	// Y = +-sqrt(x^3 + B)
-	x3 := new(big.Int).Mul(x, x)
-	x3.Mul(x3, x)
-	x3.Add(x3, curve.Params().B)
-	x3.Mod(x3, curve.Params().P)
+// 	// TODO: This will probably only work for secp256k1 due to
+// 	// optimizations.
 
-	// Now calculate sqrt mod p of x^3 + B
-	// This code used to do a full sqrt based on tonelli/shanks,
-	// but this was replaced by the algorithms referenced in
-	// https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
-	y := new(big.Int).Exp(x3, curve.QPlus1Div4(), curve.Params().P)
+// 	// Y = +-sqrt(x^3 + B)
+// 	x3 := new(big.Int).Mul(x, x)
+// 	x3.Mul(x3, x)
+// 	x3.Add(x3, curve.Params().B)
+// 	x3.Mod(x3, curve.Params().P)
 
-	if ybit != isOdd(y) {
-		y.Sub(curve.Params().P, y)
-	}
+// 	// Now calculate sqrt mod p of x^3 + B
+// 	// This code used to do a full sqrt based on tonelli/shanks,
+// 	// but this was replaced by the algorithms referenced in
+// 	// https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
+// 	y := new(big.Int).Exp(x3, curve.QPlus1Div4(), curve.Params().P)
 
-	// Check that y is a square root of x^3 + B.
-	y2 := new(big.Int).Mul(y, y)
-	y2.Mod(y2, curve.Params().P)
-	if y2.Cmp(x3) != 0 {
-		return nil, fmt.Errorf("invalid square root")
-	}
+// 	if ybit != isOdd(y) {
+// 		y.Sub(curve.Params().P, y)
+// 	}
 
-	// Verify that y-coord has expected parity.
-	if ybit != isOdd(y) {
-		return nil, fmt.Errorf("ybit doesn't match oddness")
-	}
+// 	// Check that y is a square root of x^3 + B.
+// 	y2 := new(big.Int).Mul(y, y)
+// 	y2.Mod(y2, curve.Params().P)
+// 	if y2.Cmp(x3) != 0 {
+// 		return nil, fmt.Errorf("invalid square root")
+// 	}
 
-	return y, nil
-}
+// 	// Verify that y-coord has expected parity.
+// 	if ybit != isOdd(y) {
+// 		return nil, fmt.Errorf("ybit doesn't match oddness")
+// 	}
+
+// 	return y, nil
+// }
 
 const (
 	pubkeyCompressed   byte = 0x2 // y_bit + x coord
@@ -202,63 +202,63 @@ func IsCompressedPubKey(pubKey []byte) bool {
 		(pubKey[0]&^byte(0x1) == pubkeyCompressed)
 }
 
-// ParsePubKey parses a public key for a koblitz curve from a bytestring into a
-// ecdsa.Publickey, verifying that it is valid. It supports compressed,
-// uncompressed and hybrid signature formats.
-func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err error) {
-	pubkey := PublicKey{}
-	pubkey.Curve = curve
+// // ParsePubKey parses a public key for a koblitz curve from a bytestring into a
+// // ecdsa.Publickey, verifying that it is valid. It supports compressed,
+// // uncompressed and hybrid signature formats.
+// func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err error) {
+// 	pubkey := PublicKey{}
+// 	pubkey.Curve = curve
 
-	if len(pubKeyStr) == 0 {
-		return nil, errors.New("pubkey string is empty")
-	}
+// 	if len(pubKeyStr) == 0 {
+// 		return nil, errors.New("pubkey string is empty")
+// 	}
 
-	format := pubKeyStr[0]
-	ybit := (format & 0x1) == 0x1
-	format &= ^byte(0x1)
+// 	format := pubKeyStr[0]
+// 	ybit := (format & 0x1) == 0x1
+// 	format &= ^byte(0x1)
 
-	switch len(pubKeyStr) {
-	case PubKeyBytesLenUncompressed:
-		if format != pubkeyUncompressed && format != pubkeyHybrid {
-			return nil, fmt.Errorf("invalid magic in pubkey str: "+
-				"%d", pubKeyStr[0])
-		}
+// 	switch len(pubKeyStr) {
+// 	case PubKeyBytesLenUncompressed:
+// 		if format != pubkeyUncompressed && format != pubkeyHybrid {
+// 			return nil, fmt.Errorf("invalid magic in pubkey str: "+
+// 				"%d", pubKeyStr[0])
+// 		}
 
-		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
-		pubkey.Y = new(big.Int).SetBytes(pubKeyStr[33:])
-		// hybrid keys have extra information, make use of it.
-		if format == pubkeyHybrid && ybit != isOdd(pubkey.Y) {
-			return nil, fmt.Errorf("ybit doesn't match oddness")
-		}
-	case PubKeyBytesLenCompressed:
-		// format is 0x2 | solution, <X coordinate>
-		// solution determines which solution of the curve we use.
-		/// y^2 = x^3 + Curve.B
-		if format != pubkeyCompressed {
-			return nil, fmt.Errorf("invalid magic in compressed "+
-				"pubkey string: %d", pubKeyStr[0])
-		}
-		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
-		pubkey.Y, err = decompressPoint(curve, pubkey.X, ybit)
-		if err != nil {
-			return nil, err
-		}
-	default: // wrong!
-		return nil, fmt.Errorf("invalid pub key length %d",
-			len(pubKeyStr))
-	}
+// 		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
+// 		pubkey.Y = new(big.Int).SetBytes(pubKeyStr[33:])
+// 		// hybrid keys have extra information, make use of it.
+// 		if format == pubkeyHybrid && ybit != isOdd(pubkey.Y) {
+// 			return nil, fmt.Errorf("ybit doesn't match oddness")
+// 		}
+// 	case PubKeyBytesLenCompressed:
+// 		// format is 0x2 | solution, <X coordinate>
+// 		// solution determines which solution of the curve we use.
+// 		/// y^2 = x^3 + Curve.B
+// 		if format != pubkeyCompressed {
+// 			return nil, fmt.Errorf("invalid magic in compressed "+
+// 				"pubkey string: %d", pubKeyStr[0])
+// 		}
+// 		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
+// 		pubkey.Y, err = decompressPoint(curve, pubkey.X, ybit)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 	default: // wrong!
+// 		return nil, fmt.Errorf("invalid pub key length %d",
+// 			len(pubKeyStr))
+// 	}
 
-	if pubkey.X.Cmp(pubkey.Curve.Params().P) >= 0 {
-		return nil, fmt.Errorf("pubkey X parameter is >= to P")
-	}
-	if pubkey.Y.Cmp(pubkey.Curve.Params().P) >= 0 {
-		return nil, fmt.Errorf("pubkey Y parameter is >= to P")
-	}
-	if !pubkey.Curve.IsOnCurve(pubkey.X, pubkey.Y) {
-		return nil, fmt.Errorf("pubkey isn't on secp256k1 curve")
-	}
-	return &pubkey, nil
-}
+// 	if pubkey.X.Cmp(pubkey.Curve.Params().P) >= 0 {
+// 		return nil, fmt.Errorf("pubkey X parameter is >= to P")
+// 	}
+// 	if pubkey.Y.Cmp(pubkey.Curve.Params().P) >= 0 {
+// 		return nil, fmt.Errorf("pubkey Y parameter is >= to P")
+// 	}
+// 	if !pubkey.Curve.IsOnCurve(pubkey.X, pubkey.Y) {
+// 		return nil, fmt.Errorf("pubkey isn't on secp256k1 curve")
+// 	}
+// 	return &pubkey, nil
+// }
 
 // PublicKey is an ecdsa.PublicKey with additional functions to
 // serialize in uncompressed, compressed, and hybrid formats.

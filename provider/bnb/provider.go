@@ -1,8 +1,6 @@
 package bnb
 
 import (
-	"bytes"
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/sha512"
@@ -14,27 +12,29 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/binance-chain/go-sdk/types"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/dynamicgo/xerrors"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 
 	"github.com/openzknetwork/gochain/rpc/bnb"
-	"github.com/openzknetwork/gochain/script/neo/script"
 	"github.com/openzknetwork/key"
-	"github.com/openzknetwork/key/internal/base58"
 	"github.com/openzknetwork/key/internal/bip39"
 	"github.com/openzknetwork/key/internal/ecdsax"
 	"github.com/openzknetwork/key/sign"
 	"github.com/openzknetwork/key/sign/recoverable"
 )
 
+// EncryptedKeyJSON .
 type EncryptedKeyJSON struct {
 	Address string     `json:"address"`
 	Crypto  CryptoJSON `json:"crypto"`
 	Id      string     `json:"id"`
 	Version int        `json:"version"`
 }
+
+// CryptoJSON  .
 type CryptoJSON struct {
 	Cipher       string                 `json:"cipher"`
 	CipherText   string                 `json:"ciphertext"`
@@ -73,6 +73,7 @@ func (key *keyImpl) PriKey() []byte {
 }
 
 func (key *keyImpl) PubKey() []byte {
+
 	return key.key.PubKey().Bytes()
 	// return ecdsax.PublicKeyBytes(&key.key.PublicKey)
 }
@@ -260,13 +261,11 @@ func (provider *providerIml) Curve() elliptic.Curve {
 }
 
 func (provider *providerIml) PublicKeyToAddress(pubkey []byte) (string, error) {
-	publicKey := ecdsax.BytesToPublicKey(provider.curve, pubkey)
+	key := new(secp256k1.PubKeySecp256k1)
+	codec := types.NewCodec()
+	codec.MustUnmarshalBinaryBare(pubkey, key)
 
-	if nil == pubkey {
-		return "", xerrors.Wrapf(key.ErrPublicKey, "decode public key error")
-	}
-
-	return pubKeyToAddress(publicKey)
+	return bnb.AccAddress(key.Address()).String(), nil
 }
 
 func (provider *providerIml) Recover(sig []byte, hash []byte) (pubkey []byte, err error) {
@@ -312,43 +311,6 @@ var (
 
 func init() {
 	key.RegisterProvider(newProvider("bnb", elliptic.P256()))
-}
-
-func pubKeyToScriptHash(publicKey *ecdsa.PublicKey) ([]byte, error) {
-
-	x := publicKey.X.Bytes()
-
-	/* Pad X to 32-bytes */
-	paddedx := append(bytes.Repeat([]byte{0x00}, 32-len(x)), x...)
-
-	var pubbytes []byte
-
-	/* Add prefix 0x02 or 0x03 depending on ylsb */
-	if publicKey.Y.Bit(0) == 0 {
-		pubbytes = append([]byte{0x02}, paddedx...)
-	} else {
-		pubbytes = append([]byte{0x03}, paddedx...)
-	}
-
-	addressScript := script.New("address")
-
-	addressScript.EmitPushBytes(pubbytes)
-	addressScript.Emit(script.CHECKSIG, nil)
-
-	return addressScript.Hash()
-
-}
-
-// PrivateToAddress .
-func pubKeyToAddress(pukey *ecdsa.PublicKey) (string, error) {
-
-	programhash, err := pubKeyToScriptHash(pukey)
-
-	if err != nil {
-		return "", err
-	}
-
-	return base58.CheckEncode(programhash, 0x17), nil
 }
 
 // i64 returns the two halfs of the SHA512 HMAC of key and data.
@@ -437,12 +399,14 @@ func addScalars(a []byte, b []byte) [32]byte {
 	return x2
 }
 
+// NewMnemonicKeyManager .
 func NewMnemonicKeyManager(mnemonic string) (key.Key, error) {
 	k := keyImpl{}
 	err := k.recoveryFromKMnemonic(mnemonic)
 	return &k, err
 }
 
+// NewPrivateKeyManager .
 func NewPrivateKeyManager(priKey string) (key.Key, error) {
 	k := keyImpl{}
 	err := k.recoveryFromPrivateKey(priKey)
