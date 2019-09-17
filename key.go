@@ -7,6 +7,8 @@ import (
 	"io"
 
 	"github.com/openzknetwork/key/internal/bip32"
+	"github.com/openzknetwork/key/internal/ecdsax"
+	"github.com/openzknetwork/key/internal/ecies"
 
 	"github.com/openzknetwork/key/internal/bip39"
 
@@ -238,4 +240,19 @@ func FromMnemonic(driver string, mnemonic string, path string) (Key, error) {
 	}
 
 	return fromMnemonic(provider, mnemonic, path)
+}
+
+// EncryptBlock .
+func EncryptBlock(driver string, pubkey []byte, message []byte) ([]byte, error) {
+	var provider Provider
+	if !injector.Get(prefix+driver, &provider) {
+		return nil, xerrors.Wrapf(ErrDriver, "unknown driver %s", driver)
+	}
+
+	return ecies.Encrypt(rand.Reader, ecies.ImportECDSAPublic(ecdsax.BytesToPublicKey(provider.Curve(), pubkey)), message, nil, nil)
+}
+
+// DecryptBlock .
+func DecryptBlock(key Key, message []byte) ([]byte, error) {
+	return ecies.ImportECDSA(ecdsax.BytesToPrivateKey(key.PriKey(), key.Provider().Curve())).Decrypt(message, nil, nil)
 }

@@ -175,3 +175,20 @@ func TestEOSSign(t *testing.T) {
 
 	require.Equal(t, pubkey, k.PubKey())
 }
+
+func TestEncryptBlock(t *testing.T) {
+	k, err := key.New("did")
+	require.NoError(t, err)
+
+	c, err := key.EncryptBlock("did", k.PubKey(), []byte("hello world"))
+
+	require.NoError(t, err)
+
+	println(hex.EncodeToString(c))
+
+	c, err = key.DecryptBlock(k, c)
+
+	require.NoError(t, err)
+
+	require.Equal(t, c, []byte("hello world"))
+}
