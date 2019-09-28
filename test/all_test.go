@@ -18,6 +18,7 @@ import (
 	_ "github.com/openzknetwork/key/encryptor"
 	_ "github.com/openzknetwork/key/provider"
 
+	ctypes "github.com/binance-chain/go-sdk/common/types"
 	bnbkeys "github.com/binance-chain/go-sdk/keys"
 )
 
@@ -338,7 +339,7 @@ func TestMnemonicDrived(t *testing.T) {
 
 func TestParseMnemonic(t *testing.T) {
 	mnemonic := "hint label crouch nation club brick fashion glow ring uniform panda bicycle road glow range crunch benefit lawn hen rabbit mutual sustain decrease jump"
-	k, err := key.FromMnemonic("bnb", mnemonic, "m/44'/714'/0'/0/0")
+	k, err := key.FromMnemonic("tbnb", mnemonic, "m/44'/714'/0'/0/0")
 
 	require.NoError(t, err)
 
@@ -351,6 +352,7 @@ func TestParseMnemonic(t *testing.T) {
 
 	println("pub key", hex.EncodeToString(km.GetPrivKey().PubKey().Bytes()))
 
+	ctypes.Network = ctypes.TestNetwork
 	println(km.GetAddr().String())
 }
 
