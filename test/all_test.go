@@ -17,6 +17,8 @@ import (
 	"github.com/openzknetwork/key"
 	_ "github.com/openzknetwork/key/encryptor"
 	_ "github.com/openzknetwork/key/provider"
+
+	bnbkeys "github.com/binance-chain/go-sdk/keys"
 )
 
 func TestDid(t *testing.T) {
@@ -335,6 +337,24 @@ func TestMnemonicDrived(t *testing.T) {
 }
 
 func TestParseMnemonic(t *testing.T) {
+	mnemonic := "hint label crouch nation club brick fashion glow ring uniform panda bicycle road glow range crunch benefit lawn hen rabbit mutual sustain decrease jump"
+	k, err := key.FromMnemonic("bnb", mnemonic, "m/44'/714'/0'/0/0")
+
+	require.NoError(t, err)
+
+	println("pub key", hex.EncodeToString(k.PubKey()))
+	println(k.Address())
+
+	km, err := bnbkeys.NewMnemonicKeyManager(mnemonic)
+
+	require.NoError(t, err)
+
+	println("pub key", hex.EncodeToString(km.GetPrivKey().PubKey().Bytes()))
+
+	println(km.GetAddr().String())
+}
+
+func TestEthMnemonic(t *testing.T) {
 	mnemonic := "keep sentence oxygen virtual flush aspect witness tent latin report auction thumb"
 	k, err := key.FromMnemonic("eth", mnemonic, "m/44'/60'/0'/0/0")
 
