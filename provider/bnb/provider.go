@@ -327,6 +327,8 @@ func i64(key []byte, data []byte) (IL [32]byte, IR [32]byte) {
 // DerivePrivateKeyForPath derives the private key by following the BIP 32/44 path from privKeyBytes,
 // using the given chainCode.
 func derivePrivateKeyForPath(privKeyBytes [32]byte, chainCode [32]byte, path string) ([32]byte, error) {
+	// println(path)
+	// path = "m/"+path
 	data := privKeyBytes
 	parts := strings.Split(path, "/")
 	for _, part := range parts {

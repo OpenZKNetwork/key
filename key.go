@@ -278,6 +278,10 @@ func FromMnemonic(driver string, mnemonic string, path string) (Key, error) {
 	if !injector.Get(prefix+driver, &provider) {
 		return nil, xerrors.Wrapf(ErrDriver, "unknown driver %s", driver)
 	}
+	// println(path)
+	// if driver == "bnb" {
+	// 	return bnb.NewMnemonicKeyManager(mnemonic)
+	// }
 
 	return fromMnemonic(provider, mnemonic, path)
 }

@@ -31,7 +31,6 @@ func TestDid(t *testing.T) {
 
 func TestEthKey(t *testing.T) {
 	k, err := key.New("eth")
-
 	require.NoError(t, err)
 
 	println("address", k.Address())
