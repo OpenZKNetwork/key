@@ -30,6 +30,28 @@ type KeyParam interface {
 	Curve() elliptic.Curve
 }
 
+func isOdd(a *big.Int) bool {
+	return a.Bit(0) == 1
+}
+
+func paddedAppend(size uint, dst, src []byte) []byte {
+	for i := 0; i < int(size)-len(src); i++ {
+		dst = append(dst, 0)
+	}
+	return append(dst, src...)
+}
+
+// CompressedPublicKeyBytes .
+func compressedPublicKeyBytes(x, y *big.Int) []byte {
+	b := make([]byte, 0, 33)
+	format := byte(0x2)
+	if isOdd(y) {
+		format |= 0x1
+	}
+	b = append(b, format)
+	return paddedAppend(32, b, x.Bytes())
+}
+
 func compress(x, y *big.Int) []byte {
 	two := big.NewInt(2)
 	rem := two.Mod(y, two).Uint64()
@@ -41,7 +63,7 @@ func compress(x, y *big.Int) []byte {
 }
 
 func privateToPublic(curve elliptic.Curve, key []byte) []byte {
-	return compress(curve.ScalarBaseMult(key))
+	return compressedPublicKeyBytes(curve.ScalarBaseMult(key))
 }
 
 // NewMasterKey create new master key from seed

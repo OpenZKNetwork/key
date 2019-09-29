@@ -247,6 +247,33 @@ func NewMnemonic(driver string, path string) (string, Key, error) {
 	return mnemonic, key, err
 }
 
+// NewMnemonicWithLength .
+func NewMnemonicWithLength(driver string, path string, length int) (string, Key, error) {
+
+	var provider Provider
+	if !injector.Get(prefix+driver, &provider) {
+		return "", nil, xerrors.Wrapf(ErrDriver, "unknown driver %s", driver)
+	}
+
+	seed := make([]byte, length)
+
+	_, err := rand.Read(seed)
+
+	if err != nil {
+		return "", nil, xerrors.Wrapf(err, "create seed error")
+	}
+
+	mnemonic, err := bip39.NewMnemonic(seed, bip39.ENUS())
+
+	if err != nil {
+		return "", nil, xerrors.Wrapf(err, "create mnemonic error")
+	}
+
+	key, err := fromMnemonic(provider, mnemonic, path)
+
+	return mnemonic, key, err
+}
+
 func fromMnemonic(provider Provider, mnemonic string, path string) (Key, error) {
 	masterkey, err := bip32.FromMnemonic(provider, mnemonic, "")
 
